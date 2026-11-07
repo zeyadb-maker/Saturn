@@ -101,6 +101,7 @@ def call_model(session,url,model,fragment,path,part,total,timeout,retries):
 
 def convert_one(item,root,outputs,args):
     i,total,p=item; dest=outputs[p]; rel=p.relative_to(root)
+    model=args.models[(i-1)%len(args.models)]
     dest.parent.mkdir(parents=True,exist_ok=True); started=time.monotonic()
     try:
         parts=chunks(p.read_text(encoding="utf-8",errors="replace"),args.chunk_chars)
