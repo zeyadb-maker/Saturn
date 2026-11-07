@@ -214,26 +214,30 @@ static void controller_sdl_read(OSContPad *pad) {
 
     bool touch_a = false;
     bool touch_b = false;
-    const int touch_count = SDL_GetNumTouchFingers(0);
-    for (int i = 0; i < touch_count; ++i) {
-        SDL_Finger *finger = SDL_GetTouchFinger(0, i);
-        if (!finger) continue;
+    const int touch_devices = SDL_GetNumTouchDevices();
+    for (int device = 0; device < touch_devices; ++device) {
+        const SDL_TouchID touch_id = SDL_GetTouchDevice(device);
+        const int touch_count = SDL_GetNumTouchFingers(touch_id);
+        for (int i = 0; i < touch_count; ++i) {
+            SDL_Finger *finger = SDL_GetTouchFinger(touch_id, i);
+            if (!finger) continue;
 
-        const float x = finger->x;
-        const float y = finger->y;
-        if (x < 0.5f) {
-            const float dx = (x - 0.20f) / 0.17f;
-            const float dy = (y - 0.72f) / 0.17f;
-            leftx = (int16_t)(fmaxf(-1.0f, fminf(1.0f, dx)) * 32767.0f);
-            lefty = (int16_t)(fmaxf(-1.0f, fminf(1.0f, dy)) * 32767.0f);
-        } else if (y >= 0.48f) {
-            const float dx = (x - 0.80f) / 0.17f;
-            const float dy = (y - 0.72f) / 0.17f;
-            rightx = (int16_t)(fmaxf(-1.0f, fminf(1.0f, dx)) * 32767.0f);
-            righty = (int16_t)(fmaxf(-1.0f, fminf(1.0f, dy)) * 32767.0f);
-        } else if (x >= 0.72f) {
-            if (x >= 0.86f) touch_a = true;
-            else touch_b = true;
+            const float x = finger->x;
+            const float y = finger->y;
+            if (x < 0.5f) {
+                const float dx = (x - 0.20f) / 0.17f;
+                const float dy = (y - 0.72f) / 0.17f;
+                leftx = (int16_t)(fmaxf(-1.0f, fminf(1.0f, dx)) * 32767.0f);
+                lefty = (int16_t)(fmaxf(-1.0f, fminf(1.0f, dy)) * 32767.0f);
+            } else if (y >= 0.48f) {
+                const float dx = (x - 0.80f) / 0.17f;
+                const float dy = (y - 0.72f) / 0.17f;
+                rightx = (int16_t)(fmaxf(-1.0f, fminf(1.0f, dx)) * 32767.0f);
+                righty = (int16_t)(fmaxf(-1.0f, fminf(1.0f, dy)) * 32767.0f);
+            } else if (x >= 0.72f) {
+                if (x >= 0.86f) touch_a = true;
+                else touch_b = true;
+            }
         }
     }
 
