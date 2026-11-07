@@ -22,13 +22,15 @@ jobs:
         with:
           update: true
           install: >-
-            unzip make git
+            unzip make git python3
             mingw-w64-x86_64-gcc
             mingw-w64-x86_64-glew
             mingw-w64-x86_64-SDL2
             mingw-w64-x86_64-SDL
             mingw-w64-x86_64-curl
             mingw-w64-x86_64-jsoncpp
+      - name: Prepare generated output directories
+        run: python3 tools/prepare_build_dirs.py
       - name: Build Saturn
         run: make -j$(nproc)
       - name: Upload Windows build
@@ -50,6 +52,8 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             build-essential git python3 libglew-dev libsdl2-dev \
             curl libcurl4-gnutls-dev libjsoncpp-dev
+      - name: Prepare generated output directories
+        run: python3 tools/prepare_build_dirs.py
       - name: Build Saturn
         run: make -j"$(nproc)"
       - name: Upload Linux build
@@ -72,12 +76,7 @@ jobs:
         run: |
           make -C tools textconv CC=clang
       - name: Prepare generated output directories
-        run: |
-          mkdir -p build/us_pc
-          find actors levels textures bin src -type d -print0 | while IFS= read -r -d '' dir; do
-            mkdir -p "build/us_pc/${dir}"
-          done
-          mkdir -p build/us_pc/include
+        run: python3 tools/prepare_build_dirs.py
       - name: Build Saturn
         run: |
           export CPATH="$(brew --prefix)/include${CPATH:+:$CPATH}"
