@@ -1,13 +1,14 @@
-name: Compile and Swift migration
+name: Saturn native builds (fast)
 concurrency:
-  group: swift-migration-${{ github.ref }}
+  group: saturn-native-${{ github.ref }}
   cancel-in-progress: true
 on:
   push:
     branches: ["legacy"]
   workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
+
 jobs:
   windows:
     name: Windows (MSYS2)
@@ -18,152 +19,61 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: msys2/setup-msys2@v2
-      - name: Fetch Dependencies
-        run: pacman -S --noconfirm unzip make git mingw-w64-x86_64-gcc mingw-w64-x86_64-glew mingw-w64-x86_64-SDL2 mingw-w64-x86_64-SDL python3 mingw-w64-x86_64-curl mingw-w64-x86_64-jsoncpp
-      - name: Build
-        run: |
-          make
-          cd build/us_pc
-          rm -rf textures text src sound lib levels include data bin assets actors res
-          rm -f level_rules.mk
-          cd ../../
-      - name: Upload Binaries
+        with:
+          update: true
+          install: >-
+            unzip make git
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-glew
+            mingw-w64-x86_64-SDL2
+            mingw-w64-x86_64-SDL
+            mingw-w64-x86_64-curl
+            mingw-w64-x86_64-jsoncpp
+      - name: Build Saturn
+        run: make -j$(nproc)
+      - name: Upload Windows build
         uses: actions/upload-artifact@v4
         with:
           name: saturn-windows-build
-          path: D:\a\Saturn\Saturn\build\us_pc\
+          path: build/us_pc/
+          if-no-files-found: error
+          retention-days: 7
+
   linux:
     name: Linux
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Fetch Dependencies
+      - name: Install dependencies
         run: |
-          sudo apt update
-          sudo apt install -y build-essential git python3 libglew-dev libsdl2-dev curl libcurl4-gnutls-dev libjsoncpp-dev
-      - name: Build
-        run: |
-          make
-          cd build/us_pc
-          rm -rf textures text src sound lib levels include data bin assets actors res
-          rm -f level_rules.mk
-          cd ../../
-      - name: Upload Binaries
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential git python3 libglew-dev libsdl2-dev \
+            curl libcurl4-gnutls-dev libjsoncpp-dev
+      - name: Build Saturn
+        run: make -j"$(nproc)"
+      - name: Upload Linux build
         uses: actions/upload-artifact@v4
         with:
           name: saturn-linux-build
-          path: /home/runner/work/Saturn/Saturn/build/us_pc
-  convert-and-generate-xcode:
-    name: Convert source files and generate Xcode project
+          path: build/us_pc/
+          if-no-files-found: error
+          retention-days: 7
+
+  macos:
+    name: macOS native build
     runs-on: macos-latest
-    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: legacy
-          fetch-depth: 0
-      - name: Remove old failed Swift output
+      - name: Install dependencies
         run: |
-          git rm -r --ignore-unmatch SwiftPort
-          if ! git diff --cached --quiet; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git commit -m "Remove failed Swift conversion output [skip ci]"
-            git push origin HEAD:legacy
-          fi
-          rm -rf SwiftPort
-          mkdir -p SwiftPort
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Install macOS tools
-        run: |
-          brew install ollama xcodegen
-          python -m pip install --upgrade pip
-          python -m pip install requests
-          ollama --version
-          xcodegen --version
-          python --version
-      - name: Start Ollama
-        run: |
-          OLLAMA_NUM_PARALLEL=2 OLLAMA_MAX_LOADED_MODELS=2 nohup ollama serve >/tmp/ollama.log 2>&1 &
-          for i in {1..60}; do
-            if curl -fsS http://127.0.0.1:11434/api/tags >/dev/null; then break; fi
-            sleep 2
-          done
-          curl -fsS http://127.0.0.1:11434/api/tags >/dev/null
-      - name: Download models
-        run: |
-          ollama pull qwen2.5-coder:3b
-          ollama pull qwen2.5-coder:1.5b
-      - name: Test Ollama generation API
-        run: |
-          python3 - <<'PY'
-          import requests
-          for model in ("qwen2.5-coder:3b","qwen2.5-coder:1.5b"):
-              r=requests.post("http://127.0.0.1:11434/api/generate",json={"model":model,"prompt":"Return only the Swift expression: 1 + 1","stream":False},timeout=180)
-              if not r.ok:
-                  raise SystemExit(f"Ollama smoke test failed for {model}: HTTP {r.status_code}: {r.text[:2000]}")
-              print(f"{model} generation API is responding:",r.json().get("response","")[:120])
-          PY
-      - name: Convert C/C++ and functional Python files
-        env:
-          OLLAMA_MODEL: qwen2.5-coder:3b
-          OLLAMA_MODELS: qwen2.5-coder:3b,qwen2.5-coder:1.5b
-        run: python3 tools/convert_to_swift.py --root . --output SwiftPort --timeout 240 --retries 2 --workers 4 --models "qwen2.5-coder:3b,qwen2.5-coder:1.5b" --chunk-chars 3000
-      - name: Add Swift entry point
-        run: |
-          cat > SwiftPort/GeneratedProjectMain.swift <<'SWIFT'
-          import Foundation
-          @main
-          enum SaturnSwiftEntry {
-              static func main() {
-                  print("Saturn Swift migration output. Review conversion_report.json before integration.")
-              }
-          }
-          SWIFT
-      - name: Generate Xcode project
-        run: |
-          cat > project.yml <<'YAML'
-          name: SaturnSwift
-          options:
-            deploymentTarget:
-              macOS: "13.0"
-          targets:
-            SaturnSwift:
-              type: tool
-              platform: macOS
-              sources:
-                - path: SwiftPort
-              settings:
-                base:
-                  PRODUCT_BUNDLE_IDENTIFIER: org.saturn.swiftport
-                  SWIFT_VERSION: "5.9"
-                  MACOSX_DEPLOYMENT_TARGET: "13.0"
-          YAML
-          xcodegen generate --spec project.yml
-          test -d SaturnSwift.xcodeproj
-      - name: Upload generated files
-        if: always()
+          brew install glew sdl2 curl jsoncpp
+      - name: Build Saturn
+        run: make -j"$(sysctl -n hw.ncpu)"
+      - name: Upload macOS build
         uses: actions/upload-artifact@v4
         with:
-          name: saturn-swift-port
-          path: |
-            SwiftPort/
-            SaturnSwift.xcodeproj/
-            project.yml
-          if-no-files-found: warn
-          retention-days: 30
-      - name: Commit generated Swift and Xcode project
-        if: success()
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add SwiftPort SaturnSwift.xcodeproj project.yml
-          if git diff --cached --quiet; then
-            echo "No generated changes to commit."
-            exit 0
-          fi
-          git commit -m "Regenerate Swift source files [skip ci]"
-          git push origin HEAD:legacy
+          name: saturn-macos-build
+          path: build/us_pc/
+          if-no-files-found: error
+          retention-days: 7
