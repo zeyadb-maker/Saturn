@@ -392,7 +392,7 @@ static void convert_file(const char *infilename, const char *outfilename)
     FILE *fout = strcmp(outfilename, "-") != 0 ? fopen(outfilename, "wb") : stdout;
 
     if (fout == NULL)
-        fatal_error("failed to open file '%s' for writing: %s", strerror(errno));
+        fatal_error("failed to open file '%s' for writing: %s", outfilename, strerror(errno));
 
     char *start = in;
     char *end = in;
