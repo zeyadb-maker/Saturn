@@ -191,6 +191,7 @@ int get_saturn_level_id(int level) {
     for (int i = 0; i < IM_ARRAYSIZE(levelList); i++) {
         if (levelList[i] == level) return i;
     }
+    return -1;
 }
 
 bool override_level = false;
