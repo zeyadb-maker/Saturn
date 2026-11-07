@@ -18,6 +18,11 @@ on:
 permissions:
   contents: read
 
+# Keep iOS builds separate from the desktop/native CI concurrency group.
+concurrency:
+  group: saturn-ios-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ios-app:
     name: Build Saturn iOS app and unsigned IPA
@@ -65,11 +70,12 @@ jobs:
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -derivedDataPath build/SaturnDerivedData \
-            CODE_SIGNING_ALLOWED=NO build
+            -archivePath build/Saturn.xcarchive \
+            CODE_SIGNING_ALLOWED=NO archive
 
       - name: Package unsigned IPA
         run: |
-          APP_PATH="build/SaturnDerivedData/Build/Products/Release-iphoneos/Saturn.app"
+          APP_PATH="build/Saturn.xcarchive/Products/Applications/Saturn.app"
           test -d "$APP_PATH"
           mkdir -p build/ipa/Payload
           cp -R "$APP_PATH" build/ipa/Payload/
@@ -79,7 +85,7 @@ jobs:
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
         with:
-          name: Saturn-unsigned-ipa
+          name: Saturn-iPhone-iPad-unsigned-ipa
           path: Saturn-unsigned.ipa
           if-no-files-found: error
           retention-days: 7
