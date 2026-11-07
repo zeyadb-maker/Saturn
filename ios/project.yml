@@ -49,8 +49,6 @@ settings:
       - NODRAWINGDISTANCE=1
       - TEXTURE_FIX=1
       - EXT_OPTIONS_MENU=1
-      - DISCORDRPC=0
-      - DISCORDGAMESDK=0
 targets:
   Saturn:
     type: application
