@@ -45,6 +45,9 @@ jobs:
             -derivedDataPath build/SDL2DerivedData \
             CODE_SIGNING_ALLOWED=NO build
 
+      - name: Generate required US text headers
+        run: make -j2 NOEXTRACT=1 build/us_pc/include/text_strings.h
+
       - name: Generate Saturn iOS Xcode project
         run: xcodegen generate --spec ios/project.yml --project ios/SaturnIOS.xcodeproj
 
