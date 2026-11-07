@@ -17,6 +17,11 @@ CODE_SKIP=re.compile(r"\b(extractall|extractfile|unpack_archive|decompile|dump_a
 SYSTEM="""Translate supplied C, C++, or Python source into real Swift. Preserve algorithms,
 behavior, control flow, names, and comments. Use idiomatic Swift/Foundation.
 Do not output Python, C, C++, pseudocode, or Markdown fences. Do not omit logic.
+Saturn-specific: the original project uses SDL2 for graphics, audio, and input.
+Preserve SDL2 behavior and event/render/audio semantics. Do not silently replace SDL2
+with SDL3 or invent Swift SDL APIs. Where SDL2 C APIs cannot be called directly from
+Swift, generate a clearly named SDL2Bridge adapter boundary and mark the exact C
+interop/framework work required. Keep the original SDL symbol names in comments.
 For unavailable external APIs, add clearly marked TODO adapters/comments instead
 of inventing APIs. Input may be a fragment: translate every supplied line.
 Return code only."""
