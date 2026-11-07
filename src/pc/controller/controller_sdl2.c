@@ -193,18 +193,52 @@ static void controller_sdl_read(OSContPad *pad) {
                 }
             }
         }
-        if (sdl_cntrl == NULL) {
-            return;
+    }
+
+    /*
+     * SDL touch input is also treated as a virtual controller. This keeps
+     * the normal N64 pad mapping below shared by physical and touch input.
+     * The left half is the movement stick; the lower-right half is the
+     * camera stick; the upper-right corner contains A/B touch buttons.
+     */
+    int16_t leftx = 0, lefty = 0, rightx = 0, righty = 0;
+    int16_t ltrig = 0, rtrig = 0;
+    if (sdl_cntrl != NULL) {
+        leftx = SDL_GameControllerGetAxis(sdl_cntrl, SDL_CONTROLLER_AXIS_LEFTX);
+        lefty = SDL_GameControllerGetAxis(sdl_cntrl, SDL_CONTROLLER_AXIS_LEFTY);
+        rightx = SDL_GameControllerGetAxis(sdl_cntrl, SDL_CONTROLLER_AXIS_RIGHTX);
+        righty = SDL_GameControllerGetAxis(sdl_cntrl, SDL_CONTROLLER_AXIS_RIGHTY);
+        ltrig = SDL_GameControllerGetAxis(sdl_cntrl, SDL_CONTROLLER_AXIS_TRIGGERLEFT);
+        rtrig = SDL_GameControllerGetAxis(sdl_cntrl, SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
+    }
+
+    bool touch_a = false;
+    bool touch_b = false;
+    const int touch_count = SDL_GetNumTouchFingers(0);
+    for (int i = 0; i < touch_count; ++i) {
+        SDL_Finger *finger = SDL_GetTouchFinger(0, i);
+        if (!finger) continue;
+
+        const float x = finger->x;
+        const float y = finger->y;
+        if (x < 0.5f) {
+            const float dx = (x - 0.20f) / 0.17f;
+            const float dy = (y - 0.72f) / 0.17f;
+            leftx = (int16_t)(fmaxf(-1.0f, fminf(1.0f, dx)) * 32767.0f);
+            lefty = (int16_t)(fmaxf(-1.0f, fminf(1.0f, dy)) * 32767.0f);
+        } else if (y >= 0.48f) {
+            const float dx = (x - 0.80f) / 0.17f;
+            const float dy = (y - 0.72f) / 0.17f;
+            rightx = (int16_t)(fmaxf(-1.0f, fminf(1.0f, dx)) * 32767.0f);
+            righty = (int16_t)(fmaxf(-1.0f, fminf(1.0f, dy)) * 32767.0f);
+        } else if (x >= 0.72f) {
+            if (x >= 0.86f) touch_a = true;
+            else touch_b = true;
         }
     }
 
-    int16_t leftx = SDL_GameControllerGetAxis(sdl_cntrl, SDL_CONTROLLER_AXIS_LEFTX);
-    int16_t lefty = SDL_GameControllerGetAxis(sdl_cntrl, SDL_CONTROLLER_AXIS_LEFTY);
-    int16_t rightx = SDL_GameControllerGetAxis(sdl_cntrl, SDL_CONTROLLER_AXIS_RIGHTX);
-    int16_t righty = SDL_GameControllerGetAxis(sdl_cntrl, SDL_CONTROLLER_AXIS_RIGHTY);
-
-    int16_t ltrig = SDL_GameControllerGetAxis(sdl_cntrl, SDL_CONTROLLER_AXIS_TRIGGERLEFT);
-    int16_t rtrig = SDL_GameControllerGetAxis(sdl_cntrl, SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
+    if (touch_a) pad->button |= A_BUTTON;
+    if (touch_b) pad->button |= B_BUTTON;
 
 #ifdef TARGET_WEB
     // Firefox has a bug: https://bugzilla.mozilla.org/show_bug.cgi?id=1606562
