@@ -99,7 +99,16 @@ def convert_one(item,root,out,args):
         dest.write_text("\n".join(result),encoding="utf-8")
         return {"ok":True,"record":{"source":str(rel),"output":str(dest.relative_to(root)),"chunks":len(parts),"model_seconds":round(model_seconds,1),"total_seconds":round(time.monotonic()-started,1)}}
     except Exception as e:
-        return {"ok":False,"record":{"source":str(rel),"error":str(e),"total_seconds":round(time.monotonic()-started,1)}}
+        # Keep a one-to-one SwiftPort file even when the model fails. This is
+        # an explicit placeholder, not a claim that the source was translated.
+        safe_error=str(e).replace("\\n"," ").replace("\\r"," ").replace("*/","* /")
+        dest.write_text(
+            "// CONVERSION FAILED — manual Swift port required.\\n"
+            f"// Original source: {rel}\\n"
+            f"// Reason: {safe_error}\\n",
+            encoding="utf-8",
+        )
+        return {"ok":False,"record":{"source":str(rel),"output":str(dest.relative_to(root)),"error":str(e),"total_seconds":round(time.monotonic()-started,1)}}
 
 def main():
     ap=argparse.ArgumentParser()
