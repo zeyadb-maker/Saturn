@@ -49,7 +49,7 @@ jobs:
         run: make -j2 NOEXTRACT=1 build/us_pc/include/text_strings.h
 
       - name: Generate Saturn iOS Xcode project
-        run: xcodegen generate --spec ios/project.yml --project ios/SaturnIOS.xcodeproj
+        run: xcodegen generate --spec ios/project.yml --project ios
 
       - name: Build Saturn iOS app
         run: |
