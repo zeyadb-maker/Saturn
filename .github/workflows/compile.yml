@@ -52,7 +52,7 @@ jobs:
           path: /home/runner/work/Saturn/Saturn/build/us_pc
   convert-and-generate-xcode:
     name: Convert source files and generate Xcode project
-    runs-on: macos-14
+    runs-on: macos-latest
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
