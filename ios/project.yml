@@ -24,6 +24,7 @@ settings:
       - "$(SRCROOT)/../build/us_pc"
       - "$(SRCROOT)/../build/us_pc/include"
       - "$(SRCROOT)/../external/SDL2/include"
+      - "$(SRCROOT)/../build/SDL2Headers"
     GCC_PREPROCESSOR_DEFINITIONS:
       - "$(inherited)"
       - VERSION_US=1
