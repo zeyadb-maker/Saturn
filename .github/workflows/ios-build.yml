@@ -50,6 +50,11 @@ jobs:
             -derivedDataPath build/SDL2DerivedData \
             CODE_SIGNING_ALLOWED=NO build
 
+      - name: Prepare SDL2 include layout
+        run: |
+          mkdir -p build/SDL2Headers
+          ln -s "$GITHUB_WORKSPACE/external/SDL2/include" build/SDL2Headers/SDL2
+
       - name: Generate required US text headers
         run: |
           make -C tools textconv
