@@ -1,56 +1,134 @@
-name: Compile
-
+name: Compile and Swift migration
 on:
   push:
-    branches: [ "legacy" ]
-
+    branches: ["legacy"]
+  workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   windows:
     name: Windows (MSYS2)
-
     runs-on: windows-latest
     defaults:
       run:
         shell: msys2 {0}
-
     steps:
-    - uses: actions/checkout@v3
-    - uses: msys2/setup-msys2@v2
-    - name: Fetch Dependencies
-      run: pacman -S --noconfirm unzip make git mingw-w64-x86_64-gcc mingw-w64-x86_64-glew mingw-w64-x86_64-SDL2 mingw-w64-x86_64-SDL python3 mingw-w64-x86_64-curl mingw-w64-x86_64-jsoncpp
-    - name: Build
-      run: |
-        make
-        cd build/us_pc
-        rm -rf textures text src sound lib levels include data bin assets actors res
-        rm -f level_rules.mk
-        cd ../../
-    - name: Upload Binaries
-      uses: actions/upload-artifact@v4
-      with:
-        name: saturn-${{ github.run_number }}-${{ github.job }}
-        path: D:\a\Saturn\Saturn\build\us_pc\
-
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+      - name: Fetch Dependencies
+        run: pacman -S --noconfirm unzip make git mingw-w64-x86_64-gcc mingw-w64-x86_64-glew mingw-w64-x86_64-SDL2 mingw-w64-x86_64-SDL python3 mingw-w64-x86_64-curl mingw-w64-x86_64-jsoncpp
+      - name: Build
+        run: |
+          make
+          cd build/us_pc
+          rm -rf textures text src sound lib levels include data bin assets actors res
+          rm -f level_rules.mk
+          cd ../../
+      - name: Upload Binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: saturn-windows-build
+          path: D:\a\Saturn\Saturn\build\us_pc\
   linux:
     name: Linux
-
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v3
-    - name: Fetch Dependencies
-      run: |
-        sudo apt update
-        sudo apt install -y build-essential git python3 libglew-dev libsdl2-dev curl libcurl4-gnutls-dev libjsoncpp-dev
-    - name: Build
-      run: |
-        make
-        cd build/us_pc
-        rm -rf textures text src sound lib levels include data bin assets actors res
-        rm -f level_rules.mk
-        cd ../../
-    - name: Upload Binaries
-      uses: actions/upload-artifact@v4
-      with:
-        name: saturn-${{ github.run_number }}-${{ github.job }}
-        path: /home/runner/work/Saturn/Saturn/build/us_pc
+      - uses: actions/checkout@v4
+      - name: Fetch Dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential git python3 libglew-dev libsdl2-dev curl libcurl4-gnutls-dev libjsoncpp-dev
+      - name: Build
+        run: |
+          make
+          cd build/us_pc
+          rm -rf textures text src sound lib levels include data bin assets actors res
+          rm -f level_rules.mk
+          cd ../../
+      - name: Upload Binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: saturn-linux-build
+          path: /home/runner/work/Saturn/Saturn/build/us_pc
+  convert-and-generate-xcode:
+    name: Convert source files and generate Xcode project
+    runs-on: macos-14
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: legacy
+          fetch-depth: 0
+      - name: Install tools
+        run: |
+          brew install ollama xcodegen
+          python3 -m pip install --user requests
+      - name: Start Ollama
+        run: |
+          nohup ollama serve >/tmp/ollama.log 2>&1 &
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:11434/api/tags >/dev/null; then break; fi
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:11434/api/tags >/dev/null
+      - name: Download model
+        run: ollama pull qwen2.5-coder:7b
+      - name: Convert C/C++ and functional Python files
+        env:
+          OLLAMA_MODEL: qwen2.5-coder:7b
+        run: python3 tools/convert_to_swift.py --root . --output SwiftPort --overwrite
+      - name: Add Swift entry point
+        run: |
+          cat > SwiftPort/GeneratedProjectMain.swift <<'SWIFT'
+          import Foundation
+          @main
+          enum SaturnSwiftEntry {
+              static func main() {
+                  print("Saturn Swift migration output. Review conversion_report.json before integration.")
+              }
+          }
+          SWIFT
+      - name: Generate Xcode project
+        run: |
+          cat > project.yml <<'YAML'
+          name: SaturnSwift
+          options:
+            deploymentTarget:
+              macOS: "13.0"
+          targets:
+            SaturnSwift:
+              type: tool
+              platform: macOS
+              sources:
+                - path: SwiftPort
+              settings:
+                base:
+                  PRODUCT_BUNDLE_IDENTIFIER: org.saturn.swiftport
+                  SWIFT_VERSION: "5.9"
+                  MACOSX_DEPLOYMENT_TARGET: "13.0"
+          YAML
+          xcodegen generate --spec project.yml
+          test -d SaturnSwift.xcodeproj
+      - name: Upload generated files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: saturn-swift-port
+          path: |
+            SwiftPort/
+            SaturnSwift.xcodeproj/
+            project.yml
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Commit generated Swift and Xcode project
+        if: success()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add SwiftPort SaturnSwift.xcodeproj project.yml
+          if git diff --cached --quiet; then
+            echo "No generated changes to commit."
+            exit 0
+          fi
+          git commit -m "Generate Swift migration and Xcode project [skip ci]"
+          git push origin HEAD:legacy

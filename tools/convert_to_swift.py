@@ -1,242 +1,95 @@
 #!/usr/bin/env python3
-"""
-Best-effort repository-wide C/C++ -> Swift migration helper.
-
-Requires a local Ollama server. This writes translated files under SwiftPort/
-and never modifies the original source files.
-"""
+"""Repository-wide best-effort C/C++ and functional Python to Swift converter."""
 from __future__ import annotations
-
-import argparse
-import json
-import os
-import re
-import sys
-import time
+import argparse, ast, json, os, re, sys, time
 from pathlib import Path
-from typing import Iterable
-
 import requests
-
-SOURCE_EXTENSIONS = {
-    ".c", ".cc", ".cpp", ".cxx",
-    ".h", ".hh", ".hpp", ".hxx",
-    ".inc", ".inl", ".ipp", ".tpp",
-}
-DEFAULT_IGNORED_DIRS = {
-    ".git", ".github", ".build", "build", "dist",
-    "node_modules", ".idea", ".vscode", "SwiftPort",
-    "__pycache__",
-}
-
-SYSTEM_PROMPT = """You are a careful C and C++ to Swift migration engineer.
-Translate only the supplied source fragment into Swift.
-Preserve behavior, algorithms, names where practical, comments, and all logic.
-Use idiomatic Swift types and syntax. Do not invent unavailable APIs.
-For C/C++ APIs with no direct Swift equivalent, preserve the intent using
-clearly marked TODO comments and explain the required interoperability.
-The input may be a fragment from a larger file: do not add a new type,
-namespace, import list, or wrapper unless the fragment requires it.
-Return code only, without Markdown fences or explanations.
-Never replace implementation with pseudocode or omit code to save tokens.
-"""
-
-def chunks_by_lines(source: str, max_chars: int) -> list[str]:
-    """Split long source into line-aligned chunks."""
-    lines = source.splitlines(keepends=True)
-    chunks: list[str] = []
-    current: list[str] = []
-    size = 0
-    for line in lines:
-        if current and size + len(line) > max_chars:
-            chunks.append("".join(current))
-            current, size = [], 0
-        current.append(line)
-        size += len(line)
-    if current:
-        chunks.append("".join(current))
-    return chunks
-
-def strip_fences(text: str) -> str:
-    text = re.sub(r"^\s*```(?:swift)?\s*", "", text)
-    text = re.sub(r"\s*```\s*$", "", text)
-    return text.strip()
-
-def ask_ollama(
-    session: requests.Session,
-    endpoint: str,
-    model: str,
-    fragment: str,
-    relative_path: str,
-    part: int,
-    total: int,
-    num_ctx: int,
-    timeout: int,
-    retries: int,
-) -> str:
-    user_prompt = (
-        f"Original repository path: {relative_path}\n"
-        f"Fragment {part} of {total}.\n"
-        "Translate every line in this fragment. Preserve fragment boundaries; "
-        "do not claim this fragment is a complete file.\n\n"
-        "SOURCE CODE:\n"
-        + fragment
-    )
-    payload = {
-        "model": model,
-        "stream": False,
-        "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt},
-        ],
-        "options": {"temperature": 0.1, "num_ctx": num_ctx},
-    }
-    last_error: Exception | None = None
-    for attempt in range(retries + 1):
+EXTS={".c",".cc",".cpp",".cxx",".h",".hh",".hpp",".hxx",".inl",".ipp",".tpp",".py"}
+IGNORE={".git",".github",".build","build","dist","node_modules",".idea",".vscode","SwiftPort","__pycache__",".venv","venv","vendor","third_party","third-party"}
+NAME_SKIP=re.compile(r"(^|[_-])(extract|extractor|unpack|unpacker|decompile|asset_dump|dump_assets)([_-]|$)",re.I)
+CODE_SKIP=re.compile(r"\b(extractall|extractfile|unpack_archive|decompile|dump_assets|extract_(?:texture|model|asset|audio|sound|image|resource))\b",re.I)
+SYSTEM="""Translate supplied C, C++, or Python source into real Swift. Preserve algorithms,
+behavior, control flow, names, and comments. Use idiomatic Swift/Foundation.
+Do not output Python, C, C++, pseudocode, or Markdown fences. Do not omit logic.
+For unavailable external APIs, add clearly marked TODO adapters/comments instead
+of inventing APIs. Input may be a fragment: translate every supplied line.
+Return code only."""
+def py_ok(path,src):
+    if NAME_SKIP.search(path.stem): return False,"filename indicates extraction/unpacking"
+    try: tree=ast.parse(src)
+    except SyntaxError: return False,"not valid Python syntax"
+    logic=[n for n in tree.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef,ast.ClassDef,ast.If,ast.For,ast.AsyncFor,ast.While,ast.With,ast.AsyncWith,ast.Try,ast.Expr,ast.Assign,ast.AnnAssign))]
+    if not logic: return False,"no executable program logic"
+    funcs=[n.name.lower() for n in ast.walk(tree) if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef))]
+    extract_funcs=sum(any(w in n for w in ("extract","unpack","decompile","dump_asset")) for n in funcs)
+    calls=len(CODE_SKIP.findall(src)); archives=len(re.findall(r"\b(zipfile|tarfile|unpack_archive|extractall)\b",src,re.I))
+    if extract_funcs and extract_funcs>=max(1,len(funcs)//2): return False,"main Python functions extract/unpack data"
+    if calls>=2 or (archives>=2 and calls>=1): return False,"Python script primarily extracts/unpacks data"
+    return True,"functional Python logic"
+def discover(root,out):
+    files=[]; skipped=[]
+    for cur,dirs,names in os.walk(root):
+        dirs[:]=[d for d in dirs if d not in IGNORE and not d.startswith(".")]
+        for name in names:
+            p=Path(cur)/name
+            if p.suffix.lower() not in EXTS: continue
+            try: p.relative_to(out); continue
+            except ValueError: pass
+            try: src=p.read_text(encoding="utf-8",errors="replace")
+            except OSError as e: skipped.append({"source":str(p.relative_to(root)),"reason":str(e)}); continue
+            if p.suffix.lower()==".py":
+                ok,why=py_ok(p,src)
+                if not ok: skipped.append({"source":str(p.relative_to(root)),"reason":why}); continue
+            files.append(p)
+    return sorted(files),skipped
+def chunks(src,limit):
+    out=[]; cur=[]; size=0
+    for line in src.splitlines(keepends=True):
+        if cur and size+len(line)>limit: out.append("".join(cur));cur=[];size=0
+        cur.append(line);size+=len(line)
+    if cur: out.append("".join(cur))
+    return out or [""]
+def call_model(s,url,model,fragment,path,part,total,timeout,retries):
+    prompt=f"Original path: {path}\\nFragment {part}/{total}. Translate every line to Swift and preserve all logic.\\n\\nSOURCE:\\n{fragment}"
+    payload={"model":model,"stream":False,"messages":[{"role":"system","content":SYSTEM},{"role":"user","content":prompt}],"options":{"temperature":0.1,"num_ctx":16384}}
+    last=None
+    for attempt in range(retries+1):
         try:
-            response = session.post(endpoint, json=payload, timeout=timeout)
-            response.raise_for_status()
-            result = response.json()["message"]["content"]
-            if not result or not result.strip():
-                raise RuntimeError("Model returned an empty translation")
-            return strip_fences(result) + "\n"
-        except Exception as exc:
-            last_error = exc
-            if attempt < retries:
-                wait = min(2 ** attempt, 30)
-                print(f"  Request failed ({exc}); retrying in {wait}s...")
-                time.sleep(wait)
-    raise RuntimeError(f"Ollama request failed: {last_error}")
-
-def discover_files(root: Path, output: Path, extra_ignored: set[str]) -> list[Path]:
-    ignored = DEFAULT_IGNORED_DIRS | extra_ignored
-    found: list[Path] = []
-    for current, dirs, filenames in os.walk(root):
-        dirs[:] = [
-            name for name in dirs
-            if name not in ignored and not name.startswith(".")
-        ]
-        for filename in filenames:
-            path = Path(current) / filename
-            if path.suffix.lower() in SOURCE_EXTENSIONS:
-                try:
-                    path.relative_to(output)
-                    continue
-                except ValueError:
-                    pass
-                found.append(path)
-    return sorted(found)
-
-def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Translate C/C++ source and header files into SwiftPort/."
-    )
-    parser.add_argument("--root", type=Path, default=Path.cwd())
-    parser.add_argument("--output", default="SwiftPort")
-    parser.add_argument("--model", default=os.getenv("OLLAMA_MODEL", "qwen2.5-coder:32b"))
-    parser.add_argument("--endpoint", default=os.getenv(
-        "OLLAMA_URL", "http://localhost:11434/api/chat"
-    ))
-    parser.add_argument("--chunk-chars", type=int, default=12000)
-    parser.add_argument("--num-ctx", type=int, default=32768)
-    parser.add_argument("--timeout", type=int, default=1800)
-    parser.add_argument("--retries", type=int, default=2)
-    parser.add_argument("--overwrite", action="store_true")
-    parser.add_argument("--include-hidden", action="store_true")
-    args = parser.parse_args()
-
-    root = args.root.resolve()
-    output = (root / args.output).resolve()
-    if not root.is_dir():
-        parser.error(f"Repository root does not exist: {root}")
-    if args.chunk_chars < 1000:
-        parser.error("--chunk-chars must be at least 1000")
-
-    output.mkdir(parents=True, exist_ok=True)
-    extra_ignored = set() if args.include_hidden else set()
-    files = discover_files(root, output, extra_ignored)
-
-    print(f"Found {len(files)} C/C++ source/header files.")
-    print(f"Model: {args.model}")
-    print(f"Output: {output}")
-    print("Original files will not be changed.")
-
-    session = requests.Session()
-    successful: list[dict] = []
-    failed: list[dict] = []
-    skipped: list[str] = []
-
-    for index, source_path in enumerate(files, 1):
-        relative = source_path.relative_to(root)
-        destination = (output / relative).with_suffix(".swift")
-        destination.parent.mkdir(parents=True, exist_ok=True)
-
-        if destination.exists() and not args.overwrite:
-            print(f"[{index}/{len(files)}] SKIP existing: {relative}")
-            skipped.append(str(relative))
-            continue
-
-        print(f"[{index}/{len(files)}] {relative}")
+            r=s.post(url,json=payload,timeout=timeout);r.raise_for_status()
+            answer=r.json()["message"]["content"].strip()
+            if not answer: raise RuntimeError("empty model response")
+            return answer+"\\n"
+        except Exception as e:
+            last=e
+            if attempt<retries: time.sleep(min(2**attempt,20))
+    raise RuntimeError(f"Ollama request failed: {last}")
+def main():
+    ap=argparse.ArgumentParser()
+    ap.add_argument("--root",type=Path,default=Path.cwd());ap.add_argument("--output",default="SwiftPort")
+    ap.add_argument("--model",default=os.getenv("OLLAMA_MODEL","qwen2.5-coder:7b"))
+    ap.add_argument("--endpoint",default="http://localhost:11434/api/chat")
+    ap.add_argument("--chunk-chars",type=int,default=9000);ap.add_argument("--timeout",type=int,default=1800)
+    ap.add_argument("--retries",type=int,default=2);ap.add_argument("--overwrite",action="store_true")
+    a=ap.parse_args();root=a.root.resolve();out=(root/a.output).resolve()
+    if not root.is_dir(): ap.error("repository root does not exist")
+    out.mkdir(parents=True,exist_ok=True);files,skipped=discover(root,out)
+    print(f"Found {len(files)} files; excluded {len(skipped)} Python/data utilities.",flush=True)
+    s=requests.Session();done=[];failed=[]
+    for i,p in enumerate(files,1):
+        rel=p.relative_to(root);dest=(out/rel).with_suffix(".swift");dest.parent.mkdir(parents=True,exist_ok=True)
+        if dest.exists() and not a.overwrite:
+            skipped.append({"source":str(rel),"reason":"output already exists"});continue
+        print(f"[{i}/{len(files)}] {rel}",flush=True)
         try:
-            source = source_path.read_text(encoding="utf-8", errors="replace")
-            chunks = chunks_by_lines(source, args.chunk_chars)
-            translated_parts: list[str] = []
-
-            for part_number, chunk in enumerate(chunks, 1):
-                print(f"  Translating part {part_number}/{len(chunks)}...")
-                translated_parts.append(
-                    ask_ollama(
-                        session=session,
-                        endpoint=args.endpoint,
-                        model=args.model,
-                        fragment=chunk,
-                        relative_path=str(relative),
-                        part=part_number,
-                        total=len(chunks),
-                        num_ctx=args.num_ctx,
-                        timeout=args.timeout,
-                        retries=args.retries,
-                    )
-                )
-
-            destination.write_text(
-                "\n".join(translated_parts),
-                encoding="utf-8"
-            )
-            successful.append({
-                "source": str(relative),
-                "output": str(destination.relative_to(root)),
-                "parts": len(chunks),
-                "chunked": len(chunks) > 1,
-            })
-            print(f"  Wrote {destination.relative_to(root)}")
-        except Exception as exc:
-            failed.append({"source": str(relative), "error": str(exc)})
-            print(f"  FAILED: {exc}", file=sys.stderr)
-
-    report = {
-        "source_file_count": len(files),
-        "translated_count": len(successful),
-        "failed_count": len(failed),
-        "skipped_count": len(skipped),
-        "translated": successful,
-        "failed": failed,
-        "skipped": skipped,
-        "warning": (
-            "AI-generated Swift is not guaranteed to compile. Chunked files "
-            "may need manual integration. Validate all imports, APIs, symbols, "
-            "memory ownership, build settings, and runtime behavior."
-        ),
-    }
-    report_path = output / "conversion_report.json"
-    report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
-
-    print("\nConversion run complete.")
-    print(f"Translated: {len(successful)}")
-    print(f"Failed:     {len(failed)}")
-    print(f"Skipped:    {len(skipped)}")
-    print(f"Report:     {report_path}")
+            parts=chunks(p.read_text(encoding="utf-8",errors="replace"),a.chunk_chars);result=[]
+            for n,part in enumerate(parts,1):
+                print(f"  chunk {n}/{len(parts)}",flush=True)
+                result.append(call_model(s,a.endpoint,a.model,part,str(rel),n,len(parts),a.timeout,a.retries))
+            dest.write_text("\\n".join(result),encoding="utf-8")
+            done.append({"source":str(rel),"output":str(dest.relative_to(root)),"chunks":len(parts)})
+        except Exception as e: failed.append({"source":str(rel),"error":str(e)});print(f"FAILED: {e}",file=sys.stderr,flush=True)
+    report={"candidate_count":len(files),"translated_count":len(done),"failed_count":len(failed),"skipped_count":len(skipped),"translated":done,"failed":failed,"skipped":skipped,"note":"AI output needs manual API/interoperability and compile review."}
+    (out/"conversion_report.json").write_text(json.dumps(report,indent=2),encoding="utf-8")
+    print(f"SUMMARY translated={len(done)} failed={len(failed)} skipped={len(skipped)}",flush=True)
     return 1 if failed else 0
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+if __name__=="__main__": raise SystemExit(main())
