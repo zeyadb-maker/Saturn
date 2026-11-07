@@ -16,7 +16,7 @@
 #include <SDL2/SDL.h>
 #define GL_GLEXT_PROTOTYPES 1
 
-#ifdef OSX_BUILD
+#if defined(OSX_BUILD) && !defined(TARGET_IOS)
 #include <SDL2/SDL_opengl.h>
 #else
 #include <SDL2/SDL_opengles2.h>
@@ -222,12 +222,14 @@ static void gfx_sdl_init(const char *window_title) {
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
     #ifdef USE_GLES
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);  // These attributes allow for hardware acceleration on RPis.
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
     #endif
+    #ifndef TARGET_IOS
     SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
     SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
+    #endif
 
     //SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
     //SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
@@ -238,9 +240,24 @@ static void gfx_sdl_init(const char *window_title) {
     wnd = SDL_CreateWindow(
         window_title,
         xpos, ypos, configWindow.w, configWindow.h,
-        SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE
+        SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN
+#ifdef TARGET_IOS
+        | SDL_WINDOW_ALLOW_HIGHDPI
+#else
+        | SDL_WINDOW_RESIZABLE
+#endif
     );
+    if (wnd == NULL) {
+        fprintf(stderr, "SDL_CreateWindow failed: %s\\n", SDL_GetError());
+        return;
+    }
     ctx = SDL_GL_CreateContext(wnd);
+    if (ctx == NULL) {
+        fprintf(stderr, "SDL_GL_CreateContext failed: %s\\n", SDL_GetError());
+        SDL_DestroyWindow(wnd);
+        wnd = NULL;
+        return;
+    }
 
     saturn_imgui_init_backend(wnd, ctx);
 
