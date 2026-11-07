@@ -49,15 +49,7 @@ targets:
     type: application
     platform: iOS
     info:
-      properties:
-        CFBundleDisplayName: Saturn
-        UIUserInterfaceStyle: Dark
-        UIRequiresFullScreen: true
-        UISupportedInterfaceOrientations:
-          - UIInterfaceOrientationLandscapeLeft
-          - UIInterfaceOrientationLandscapeRight
-        UIFileSharingEnabled: true
-        LSSupportsOpeningDocumentsInPlace: true
+      path: Info.plist
     sources:
       - path: ../src
         excludes:
