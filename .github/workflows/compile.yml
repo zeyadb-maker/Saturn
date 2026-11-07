@@ -1,4 +1,7 @@
 name: Compile and Swift migration
+concurrency:
+  group: swift-migration-${{ github.ref }}
+  cancel-in-progress: true
 on:
   push:
     branches: ["legacy"]
@@ -75,7 +78,7 @@ jobs:
           python -c "import requests; print('requests', requests.__version__)"
       - name: Start Ollama
         run: |
-          nohup ollama serve >/tmp/ollama.log 2>&1 &
+          OLLAMA_NUM_PARALLEL=2 OLLAMA_MAX_LOADED_MODELS=1 nohup ollama serve >/tmp/ollama.log 2>&1 &
           for i in {1..60}; do
             if curl -fsS http://127.0.0.1:11434/api/tags >/dev/null; then break; fi
             sleep 2
@@ -85,8 +88,8 @@ jobs:
         run: ollama pull qwen2.5-coder:7b
       - name: Convert C/C++ and functional Python files
         env:
-          OLLAMA_MODEL: qwen2.5-coder:7b
-        run: python3 tools/convert_to_swift.py --root . --output SwiftPort --overwrite
+          OLLAMA_MODEL: qwen2.5-coder:3b
+        run: python3 tools/convert_to_swift.py --root . --output SwiftPort --overwrite --timeout 240 --retries 0 --workers 2 --chunk-chars 3500
       - name: Add Swift entry point
         run: |
           cat > SwiftPort/GeneratedProjectMain.swift <<'SWIFT'
