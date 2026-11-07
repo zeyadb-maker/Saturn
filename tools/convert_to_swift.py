@@ -50,7 +50,7 @@ def chunks(src,limit):
     if cur: out.append("".join(cur))
     return out or [""]
 def call_model(s,url,model,fragment,path,part,total,timeout,retries):
-    prompt=f"Original path: {path}\\nFragment {part}/{total}. Translate every line to Swift and preserve all logic.\\n\\nSOURCE:\\n{fragment}"
+    prompt=f"Original path: {path}\nFragment {part}/{total}. Translate every line to Swift and preserve all logic.\n\nSOURCE:\n{fragment}"
     payload={"model":model,"stream":False,"messages":[{"role":"system","content":SYSTEM},{"role":"user","content":prompt}],"options":{"temperature":0.1,"num_ctx":16384}}
     last=None
     for attempt in range(retries+1):
@@ -58,7 +58,7 @@ def call_model(s,url,model,fragment,path,part,total,timeout,retries):
             r=s.post(url,json=payload,timeout=timeout);r.raise_for_status()
             answer=r.json()["message"]["content"].strip()
             if not answer: raise RuntimeError("empty model response")
-            return answer+"\\n"
+            return answer+"\n"
         except Exception as e:
             last=e
             if attempt<retries: time.sleep(min(2**attempt,20))
@@ -85,7 +85,7 @@ def main():
             for n,part in enumerate(parts,1):
                 print(f"  chunk {n}/{len(parts)}",flush=True)
                 result.append(call_model(s,a.endpoint,a.model,part,str(rel),n,len(parts),a.timeout,a.retries))
-            dest.write_text("\\n".join(result),encoding="utf-8")
+            dest.write_text("\n".join(result),encoding="utf-8")
             done.append({"source":str(rel),"output":str(dest.relative_to(root)),"chunks":len(parts)})
         except Exception as e: failed.append({"source":str(rel),"error":str(e)});print(f"FAILED: {e}",file=sys.stderr,flush=True)
     report={"candidate_count":len(files),"translated_count":len(done),"failed_count":len(failed),"skipped_count":len(skipped),"translated":done,"failed":failed,"skipped":skipped,"note":"AI output needs manual API/interoperability and compile review."}
