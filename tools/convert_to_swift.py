@@ -5,7 +5,7 @@ import argparse, ast, json, os, re, sys, time
 from pathlib import Path
 import requests
 EXTS={".c",".cc",".cpp",".cxx",".h",".hh",".hpp",".hxx",".inl",".ipp",".tpp",".py"}
-IGNORE={".git",".github",".build","build","dist","node_modules",".idea",".vscode","SwiftPort","__pycache__",".venv","venv","vendor","third_party","third-party"}
+IGNORE={".git",".github",".build","build","dist","node_modules",".idea",".vscode","SwiftPort","__pycache__",".venv","venv"}
 NAME_SKIP=re.compile(r"(^|[_-])(extract|extractor|unpack|unpacker|decompile|asset_dump|dump_assets)([_-]|$)",re.I)
 CODE_SKIP=re.compile(r"\b(extractall|extractfile|unpack_archive|decompile|dump_assets|extract_(?:texture|model|asset|audio|sound|image|resource))\b",re.I)
 SYSTEM="""Translate supplied C, C++, or Python source into real Swift. Preserve algorithms,
