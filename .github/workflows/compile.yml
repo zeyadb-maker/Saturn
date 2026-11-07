@@ -62,20 +62,29 @@ jobs:
         with:
           ref: legacy
           fetch-depth: 0
+      - name: Remove old failed Swift output
+        run: |
+          git rm -r --ignore-unmatch SwiftPort
+          if ! git diff --cached --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "Remove failed Swift conversion output [skip ci]"
+            git push origin HEAD:legacy
+          fi
+          rm -rf SwiftPort
+          mkdir -p SwiftPort
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - name: Install macOS tools
         run: |
-          brew update
           brew install ollama xcodegen
           python -m pip install --upgrade pip
           python -m pip install requests
           ollama --version
           xcodegen --version
           python --version
-          python -c "import requests; print('requests', requests.__version__)"
       - name: Start Ollama
         run: |
           OLLAMA_NUM_PARALLEL=2 OLLAMA_MAX_LOADED_MODELS=1 nohup ollama serve >/tmp/ollama.log 2>&1 &
@@ -86,10 +95,19 @@ jobs:
           curl -fsS http://127.0.0.1:11434/api/tags >/dev/null
       - name: Download model
         run: ollama pull qwen2.5-coder:3b
+      - name: Test Ollama generation API
+        run: |
+          python3 - <<'PY'
+          import requests
+          r=requests.post("http://127.0.0.1:11434/api/generate",json={"model":"qwen2.5-coder:3b","prompt":"Return only the Swift expression: 1 + 1","stream":False},timeout=180)
+          if not r.ok:
+              raise SystemExit(f"Ollama smoke test failed: HTTP {r.status_code}: {r.text[:2000]}")
+          print("Ollama generation API is responding:",r.json().get("response","")[:200])
+          PY
       - name: Convert C/C++ and functional Python files
         env:
           OLLAMA_MODEL: qwen2.5-coder:3b
-        run: python3 tools/convert_to_swift.py --root . --output SwiftPort --overwrite --timeout 240 --retries 0 --workers 2 --chunk-chars 3500
+        run: python3 tools/convert_to_swift.py --root . --output SwiftPort --timeout 240 --retries 2 --workers 2 --chunk-chars 3000
       - name: Add Swift entry point
         run: |
           cat > SwiftPort/GeneratedProjectMain.swift <<'SWIFT'
@@ -143,5 +161,5 @@ jobs:
             echo "No generated changes to commit."
             exit 0
           fi
-          git commit -m "Generate Swift migration and Xcode project [skip ci]"
+          git commit -m "Regenerate Swift source files [skip ci]"
           git push origin HEAD:legacy

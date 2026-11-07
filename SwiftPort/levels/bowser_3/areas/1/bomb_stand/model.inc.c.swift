@@ -1,1 +1,0 @@
-// CONVERSION FAILED — manual Swift port required.\n// Original source: levels/bowser_3/areas/1/bomb_stand/model.inc.c\n// Reason: Ollama request failed after 1 attempt(s): 400 Client Error: Bad Request for url: http://localhost:11434/api/chat\n

@@ -1,1 +1,0 @@
-// CONVERSION FAILED — manual Swift port required.\n// Original source: actors/monty_mole/anims/anim_0500527C.inc.c\n// Reason: Ollama request failed after 1 attempt(s): 400 Client Error: Bad Request for url: http://localhost:11434/api/chat\n

@@ -1,1 +1,0 @@
-// CONVERSION FAILED — manual Swift port required.\n// Original source: actors/lakitu_cameraman/anims/anim_060058E0.inc.c\n// Reason: Ollama request failed after 1 attempt(s): 400 Client Error: Bad Request for url: http://localhost:11434/api/chat\n
