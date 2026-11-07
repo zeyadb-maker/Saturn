@@ -1,3 +1,7 @@
+#ifdef TARGET_IOS
+#include <SDL2/SDL_main.h>
+#endif
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <signal.h>

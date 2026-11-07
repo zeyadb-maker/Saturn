@@ -1,0 +1,109 @@
+name: SaturnIOS
+options:
+  deploymentTarget:
+    iOS: "13.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    PRODUCT_BUNDLE_IDENTIFIER: org.saturn.editor
+    PRODUCT_NAME: Saturn
+    TARGETED_DEVICE_FAMILY: "1,2"
+    IPHONEOS_DEPLOYMENT_TARGET: "13.0"
+    GENERATE_INFOPLIST_FILE: YES
+    INFOPLIST_KEY_CFBundleDisplayName: Saturn
+    INFOPLIST_KEY_UIUserInterfaceStyle: Dark
+    INFOPLIST_KEY_UIRequiresFullScreen: YES
+    INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+    INFOPLIST_KEY_UIFileSharingEnabled: YES
+    INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace: YES
+    CLANG_CXX_LANGUAGE_STANDARD: "c++17"
+    CLANG_CXX_LIBRARY: "libc++"
+    GCC_C_LANGUAGE_STANDARD: "gnu11"
+    CLANG_ENABLE_OBJC_ARC: YES
+    ENABLE_BITCODE: NO
+    CODE_SIGNING_ALLOWED: NO
+    HEADER_SEARCH_PATHS:
+      - "$(inherited)"
+      - "$(SRCROOT)/../include"
+      - "$(SRCROOT)/.."
+      - "$(SRCROOT)/../src"
+      - "$(SRCROOT)/../build/us_pc"
+      - "$(SRCROOT)/../build/us_pc/include"
+      - "$(SRCROOT)/../external/SDL2/include"
+    GCC_PREPROCESSOR_DEFINITIONS:
+      - "$(inherited)"
+      - VERSION_US=1
+      - _LANGUAGE_C=1
+      - NON_MATCHING=1
+      - AVOID_UB=1
+      - F3DEX_GBI_2E=1
+      - RAPI_GL=1
+      - WAPI_SDL2=1
+      - AAPI_SDL2=1
+      - CAPI_SDL2=1
+      - HAVE_SDL2=1
+      - USE_GLES=1
+      - TARGET_IOS=1
+      - EXTERNAL_DATA=1
+      - DYNOS=1
+      - NODRAWINGDISTANCE=1
+      - TEXTURE_FIX=1
+      - EXT_OPTIONS_MENU=1
+      - DISCORDRPC=0
+      - DISCORDGAMESDK=0
+targets:
+  Saturn:
+    type: application
+    platform: iOS
+    sources:
+      - path: ../src
+        excludes:
+          - game/main.c
+          - pc/discord/**
+          - saturn/discord/**
+      - path: ../actors
+      - path: ../levels
+      - path: ../bin
+      - path: ../data
+      - path: ../assets
+      - path: ../lib/src/alBnkfNew.c
+      - path: ../lib/src/guLookAtRef.c
+      - path: ../lib/src/guMtxF2L.c
+      - path: ../lib/src/guNormalize.c
+      - path: ../lib/src/guOrthoF.c
+      - path: ../lib/src/guPerspectiveF.c
+      - path: ../lib/src/guRotateF.c
+      - path: ../lib/src/guScaleF.c
+      - path: ../lib/src/guTranslateF.c
+      - path: ../lib/src/ldiv.c
+    resources:
+      - path: ../dynos
+      - path: ../fonts
+    frameworks:
+      - path: ../build/SDL2DerivedData/Build/Products/Release-iphoneos/SDL2.framework
+        embed: true
+        codeSign: false
+      - sdk: UIKit.framework
+      - sdk: Foundation.framework
+      - sdk: OpenGLES.framework
+      - sdk: AudioToolbox.framework
+      - sdk: AVFoundation.framework
+      - sdk: CoreAudio.framework
+      - sdk: CoreMotion.framework
+      - sdk: GameController.framework
+      - sdk: CoreHaptics.framework
+      - sdk: QuartzCore.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: org.saturn.editor
+        PRODUCT_NAME: Saturn
+        SDKROOT: iphoneos
+        SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
+        VALID_ARCHS: "arm64 x86_64"
+        OTHER_LDFLAGS:
+          - "$(inherited)"
+          - "-framework"
+          - SDL2
+          - "-lz"
+          - "-liconv"
+        SWIFT_OBJC_BRIDGING_HEADER: ""

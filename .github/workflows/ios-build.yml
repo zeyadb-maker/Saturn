@@ -1,0 +1,77 @@
+name: iOS app build
+on:
+  push:
+    branches: [legacy]
+    paths:
+      - "ios/**"
+      - "src/**"
+      - "actors/**"
+      - "levels/**"
+      - "bin/**"
+      - "data/**"
+      - "assets/**"
+      - "external/SDL2"
+      - ".gitmodules"
+      - ".github/workflows/ios-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ios-app:
+    name: Build Saturn iOS app and unsigned IPA
+    runs-on: macos-15
+    steps:
+      - name: Checkout Saturn and SDL2
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Build SDL2 iOS framework
+        run: |
+          xcodebuild \
+            -project external/SDL2/Xcode/SDL/SDL.xcodeproj \
+            -scheme Framework-iOS \
+            -sdk iphoneos \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build/SDL2DerivedData \
+            CODE_SIGNING_ALLOWED=NO build
+
+      - name: Generate Saturn iOS Xcode project
+        run: xcodegen generate --spec ios/project.yml --project ios/SaturnIOS.xcodeproj
+
+      - name: Build Saturn iOS app
+        run: |
+          xcodebuild \
+            -project ios/SaturnIOS.xcodeproj \
+            -scheme Saturn \
+            -sdk iphoneos \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build/SaturnDerivedData \
+            CODE_SIGNING_ALLOWED=NO build
+
+      - name: Package unsigned IPA
+        run: |
+          APP_PATH="build/SaturnDerivedData/Build/Products/Release-iphoneos/Saturn.app"
+          test -d "$APP_PATH"
+          mkdir -p build/ipa/Payload
+          cp -R "$APP_PATH" build/ipa/Payload/
+          cd build/ipa
+          zip -qry ../../Saturn-unsigned.ipa Payload
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Saturn-unsigned-ipa
+          path: Saturn-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 7
