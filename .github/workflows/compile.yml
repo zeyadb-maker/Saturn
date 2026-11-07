@@ -69,7 +69,9 @@ jobs:
         run: |
           brew install glew sdl2 curl jsoncpp
       - name: Build Saturn
-        run: make -j"$(sysctl -n hw.ncpu)"
+        run: |
+          mkdir -p build/us_pc
+          make CPP="clang -E -x c -P" -j"$(sysctl -n hw.ncpu)"
       - name: Upload macOS build
         uses: actions/upload-artifact@v4
         with:
