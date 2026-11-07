@@ -71,6 +71,8 @@ jobs:
       - name: Build Saturn
         run: |
           mkdir -p build/us_pc
+          export CPATH="$(brew --prefix)/include${CPATH:+:$CPATH}"
+          export CPLUS_INCLUDE_PATH="$(brew --prefix)/include${CPLUS_INCLUDE_PATH:+:$CPLUS_INCLUDE_PATH}"
           make CPP="clang -E -x c -P" -j"$(sysctl -n hw.ncpu)"
       - name: Upload macOS build
         uses: actions/upload-artifact@v4
