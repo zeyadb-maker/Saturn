@@ -108,7 +108,7 @@ def convert_one(item,root,outputs,args):
             result=[]; model_seconds=0.0
             for n,part in enumerate(parts,1):
                 print(f"[{i}/{total}] {rel} — chunk {n}/{len(parts)} started",flush=True)
-                translated,elapsed=call_model(session,args.endpoint,args.model,part,str(rel),n,len(parts),args.timeout,args.retries)
+                translated,elapsed=call_model(session,args.endpoint,model,part,str(rel),n,len(parts),args.timeout,args.retries)
                 result.append(translated); model_seconds+=elapsed
                 print(f"[{i}/{total}] {rel} — chunk {n}/{len(parts)} returned in {elapsed:.1f}s",flush=True)
         dest.write_text("\n".join(result),encoding="utf-8")
@@ -121,15 +121,16 @@ def convert_one(item,root,outputs,args):
 def main():
     ap=argparse.ArgumentParser()
     ap.add_argument("--root",type=Path,default=Path.cwd()); ap.add_argument("--output",default="SwiftPort")
-    ap.add_argument("--model",default=os.getenv("OLLAMA_MODEL","qwen2.5-coder:3b"))
+    ap.add_argument("--model",default=os.getenv("OLLAMA_MODEL","qwen2.5-coder:3b"),help="Fallback single model")
+    ap.add_argument("--models",default=os.getenv("OLLAMA_MODELS",""),help="Comma-separated Ollama models; files are distributed round-robin")
     ap.add_argument("--endpoint",default="http://127.0.0.1:11434/api/generate")
     ap.add_argument("--chunk-chars",type=int,default=3000); ap.add_argument("--timeout",type=int,default=240)
     ap.add_argument("--retries",type=int,default=2); ap.add_argument("--workers",type=int,default=2)
-    a=ap.parse_args(); root=a.root.resolve(); out=(root/a.output).resolve()
+    a=ap.parse_args(); a.models=[m.strip() for m in a.models.split(",") if m.strip()] or [a.model]; root=a.root.resolve(); out=(root/a.output).resolve()
     if not root.is_dir(): ap.error("repository root does not exist")
     if a.workers<1: ap.error("--workers must be at least 1")
     files,skipped=discover(root); outputs=output_paths(files,root,out); out.mkdir(parents=True,exist_ok=True)
-    print(f"Found {len(files)} source files; output names end in .swift only. Model={a.model}; workers={a.workers}.",flush=True)
+    print(f"Found {len(files)} source files; output names end in .swift only. Models={a.models}; workers={a.workers}.",flush=True)
     done=[]; failed=[]; total=len(files)
     with concurrent.futures.ThreadPoolExecutor(max_workers=a.workers) as pool:
         futures=[pool.submit(convert_one,(i,total,p),root,outputs,a) for i,p in enumerate(files,1)]

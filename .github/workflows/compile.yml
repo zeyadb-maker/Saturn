@@ -87,27 +87,31 @@ jobs:
           python --version
       - name: Start Ollama
         run: |
-          OLLAMA_NUM_PARALLEL=2 OLLAMA_MAX_LOADED_MODELS=1 nohup ollama serve >/tmp/ollama.log 2>&1 &
+          OLLAMA_NUM_PARALLEL=2 OLLAMA_MAX_LOADED_MODELS=2 nohup ollama serve >/tmp/ollama.log 2>&1 &
           for i in {1..60}; do
             if curl -fsS http://127.0.0.1:11434/api/tags >/dev/null; then break; fi
             sleep 2
           done
           curl -fsS http://127.0.0.1:11434/api/tags >/dev/null
-      - name: Download model
-        run: ollama pull qwen2.5-coder:3b
+      - name: Download models
+        run: |
+          ollama pull qwen2.5-coder:3b
+          ollama pull qwen2.5-coder:1.5b
       - name: Test Ollama generation API
         run: |
           python3 - <<'PY'
           import requests
-          r=requests.post("http://127.0.0.1:11434/api/generate",json={"model":"qwen2.5-coder:3b","prompt":"Return only the Swift expression: 1 + 1","stream":False},timeout=180)
-          if not r.ok:
-              raise SystemExit(f"Ollama smoke test failed: HTTP {r.status_code}: {r.text[:2000]}")
-          print("Ollama generation API is responding:",r.json().get("response","")[:200])
+          for model in ("qwen2.5-coder:3b","qwen2.5-coder:1.5b"):
+              r=requests.post("http://127.0.0.1:11434/api/generate",json={"model":model,"prompt":"Return only the Swift expression: 1 + 1","stream":False},timeout=180)
+              if not r.ok:
+                  raise SystemExit(f"Ollama smoke test failed for {model}: HTTP {r.status_code}: {r.text[:2000]}")
+              print(f"{model} generation API is responding:",r.json().get("response","")[:120])
           PY
       - name: Convert C/C++ and functional Python files
         env:
           OLLAMA_MODEL: qwen2.5-coder:3b
-        run: python3 tools/convert_to_swift.py --root . --output SwiftPort --timeout 240 --retries 2 --workers 2 --chunk-chars 3000
+          OLLAMA_MODELS: qwen2.5-coder:3b,qwen2.5-coder:1.5b
+        run: python3 tools/convert_to_swift.py --root . --output SwiftPort --timeout 240 --retries 2 --workers 4 --models "qwen2.5-coder:3b,qwen2.5-coder:1.5b" --chunk-chars 3000
       - name: Add Swift entry point
         run: |
           cat > SwiftPort/GeneratedProjectMain.swift <<'SWIFT'
