@@ -110,7 +110,7 @@ def main():
     out.mkdir(parents=True,exist_ok=True); files,skipped=discover(root,out)
     pending=[]; total=len(files)
     for i,p in enumerate(files,1):
-        rel=p.relative_to(root); dest=(out/rel).with_suffix(".swift")
+        rel=p.relative_to(root); dest=out / (str(rel) + ".swift")
         if dest.exists() and not a.overwrite:
             skipped.append({"source":str(rel),"reason":"output already exists"})
         else: pending.append((i,total,p))
