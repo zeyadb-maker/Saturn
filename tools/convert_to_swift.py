@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Repository-wide best-effort C/C++ and functional Python to Swift converter."""
+"""Repository-wide C/C++ and functional Python to Swift migration mirror.
+
+Every source gets its own .swift output while preserving its original extension
+(e.g. foo.c.swift and foo.h.swift), preventing same-basename overwrites.
+"""
 from __future__ import annotations
 import argparse, ast, concurrent.futures, json, os, re, sys, time
 from pathlib import Path
@@ -76,7 +80,7 @@ def call_model(session,url,model,fragment,path,part,total,timeout,retries):
 
 def convert_one(item,root,out,args):
     i,total,p=item
-    rel=p.relative_to(root); dest=(out/rel).with_suffix(".swift")
+    rel=p.relative_to(root); dest=out / (str(rel) + ".swift")
     dest.parent.mkdir(parents=True,exist_ok=True)
     started=time.monotonic()
     try:
@@ -122,7 +126,7 @@ def main():
             else:
                 failed.append(result["record"])
                 print(f"FAILED {result['record']['source']}: {result['record']['error']}",file=sys.stderr,flush=True)
-    report={"candidate_count":total,"queued_count":len(pending),"translated_count":len(done),"failed_count":len(failed),"skipped_count":len(skipped),"translated":sorted(done,key=lambda x:x["source"]),"failed":sorted(failed,key=lambda x:x["source"]),"skipped":skipped,"note":"AI output needs manual API/interoperability and compile review. Failed files are listed explicitly; the workflow continues to package partial output."}
+    report={"candidate_count":total,"queued_count":len(pending),"translated_count":len(done),"failed_count":len(failed),"skipped_count":len(skipped),"translated":sorted(done,key=lambda x:x["source"]),"failed":sorted(failed,key=lambda x:x["source"]),"skipped":skipped,"mapping":"Each source is mirrored as <original filename>.swift, preserving the original extension to avoid .c/.h basename collisions.","note":"AI output needs manual API/interoperability and compile review. Failed files are listed explicitly; the workflow continues to package partial output."}
     (out/"conversion_report.json").write_text(json.dumps(report,indent=2),encoding="utf-8")
     print(f"SUMMARY translated={len(done)} failed={len(failed)} skipped={len(skipped)}",flush=True)
     return 0
