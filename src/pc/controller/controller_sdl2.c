@@ -255,7 +255,7 @@ static void controller_sdl_read(OSContPad *pad) {
 #endif
 
     for (u32 i = 0; i < SDL_CONTROLLER_BUTTON_MAX; ++i) {
-        const bool new = SDL_GameControllerGetButton(sdl_cntrl, i);
+        const bool new = sdl_cntrl != NULL && SDL_GameControllerGetButton(sdl_cntrl, i);
         update_button(i, new);
     }
 
