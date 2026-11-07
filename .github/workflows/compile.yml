@@ -71,9 +71,15 @@ jobs:
       - name: Build required tools
         run: |
           make -C tools textconv CC=clang
+      - name: Prepare generated output directories
+        run: |
+          mkdir -p build/us_pc
+          find actors levels textures bin src -type d -print0 | while IFS= read -r -d '' dir; do
+            mkdir -p "build/us_pc/${dir}"
+          done
+          mkdir -p build/us_pc/include
       - name: Build Saturn
         run: |
-          mkdir -p build/us_pc/include
           export CPATH="$(brew --prefix)/include${CPATH:+:$CPATH}"
           export CPLUS_INCLUDE_PATH="$(brew --prefix)/include${CPLUS_INCLUDE_PATH:+:$CPLUS_INCLUDE_PATH}"
           make CPP="clang -E -x c -P" -j"$(sysctl -n hw.ncpu)"
