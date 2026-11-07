@@ -68,6 +68,9 @@ jobs:
       - name: Install dependencies
         run: |
           brew install glew sdl2 curl jsoncpp
+      - name: Build required tools
+        run: |
+          make -C tools textconv CC=clang
       - name: Build Saturn
         run: |
           mkdir -p build/us_pc
