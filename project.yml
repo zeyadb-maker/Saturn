@@ -1,0 +1,15 @@
+name: SaturnSwift
+options:
+  deploymentTarget:
+    macOS: "13.0"
+targets:
+  SaturnSwift:
+    type: tool
+    platform: macOS
+    sources:
+      - path: SwiftPort
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: org.saturn.swiftport
+        SWIFT_VERSION: "5.9"
+        MACOSX_DEPLOYMENT_TARGET: "13.0"
