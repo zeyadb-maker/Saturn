@@ -85,7 +85,7 @@ jobs:
           done
           curl -fsS http://127.0.0.1:11434/api/tags >/dev/null
       - name: Download model
-        run: ollama pull qwen2.5-coder:7b
+        run: ollama pull qwen2.5-coder:3b
       - name: Convert C/C++ and functional Python files
         env:
           OLLAMA_MODEL: qwen2.5-coder:3b
