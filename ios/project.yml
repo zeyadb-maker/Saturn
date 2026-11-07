@@ -56,10 +56,10 @@ targets:
           - game/main.c
           - pc/discord/**
           - saturn/discord/**
-          - ../levels/**/*.yaml
-          - ../levels/**/level.yaml
       - path: ../actors
       - path: ../levels
+        excludes:
+          - "**/*.yaml"
       - path: ../bin
       - path: ../data
       - path: ../assets
