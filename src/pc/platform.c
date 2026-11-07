@@ -120,13 +120,13 @@ const char *sys_user_path(void) {
     // get the new pref path from SDL
     char *sdlpath = SDL_GetPrefPath("", "v64saturn");
     if (sdlpath) {
-        const unsigned int len = strlen(sdlpath);
-        strncpy(path, sdlpath, sizeof(path));
+        const size_t len = strlen(sdlpath);
+        strncpy(path, sdlpath, sizeof(path) - 1);
         path[sizeof(path)-1] = 0;
 
         SDL_free(sdlpath);
 
-        if (path[len-1] == '/' || path[len-1] == '\\')
+        if (len > 0 && (path[len-1] == '/' || path[len-1] == '\\'))
             path[len-1] = 0; // strip the trailing separator
 
         if (!fs_sys_dir_exists(path) && !fs_sys_mkdir(path))
@@ -143,11 +143,11 @@ const char *sys_exe_path(void) {
     char *sdlpath = SDL_GetBasePath();
     if (sdlpath && sdlpath[0]) {
         // use the SDL path if it exists
-        const unsigned int len = strlen(sdlpath);
-        strncpy(path, sdlpath, sizeof(path));
+        const size_t len = strlen(sdlpath);
+        strncpy(path, sdlpath, sizeof(path) - 1);
         path[sizeof(path)-1] = 0;
         SDL_free(sdlpath);
-        if (path[len-1] == '/' || path[len-1] == '\\')
+        if (len > 0 && (path[len-1] == '/' || path[len-1] == '\\'))
             path[len-1] = 0; // strip the trailing separator
     }
     return path;
