@@ -59,10 +59,20 @@ jobs:
         with:
           ref: legacy
           fetch-depth: 0
-      - name: Install tools
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install macOS tools
         run: |
+          brew update
           brew install ollama xcodegen
-          python3 -m pip install --user requests
+          python -m pip install --upgrade pip
+          python -m pip install requests
+          ollama --version
+          xcodegen --version
+          python --version
+          python -c "import requests; print('requests', requests.__version__)"
       - name: Start Ollama
         run: |
           nohup ollama serve >/tmp/ollama.log 2>&1 &
