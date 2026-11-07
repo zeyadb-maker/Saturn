@@ -74,6 +74,8 @@ targets:
     resources:
       - path: ../dynos
       - path: ../fonts
+      - path: ../levels
+        buildPhase: resources
     frameworks:
       - path: ../build/SDL2DerivedData/Build/Products/Release-iphoneos/SDL2.framework
         embed: true
