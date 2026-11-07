@@ -15,7 +15,7 @@ xcodebuild -project external/SDL2/Xcode/SDL/SDL.xcodeproj \
   -scheme Framework-iOS -sdk iphoneos -configuration Release \
   -destination 'generic/platform=iOS' \
   -derivedDataPath build/SDL2DerivedData CODE_SIGNING_ALLOWED=NO build
-xcodegen generate --spec ios/project.yml --project ios/SaturnIOS.xcodeproj
+xcodegen generate --spec ios/project.yml --project ios
 xcodebuild -project ios/SaturnIOS.xcodeproj -scheme Saturn \
   -sdk iphoneos -configuration Release \
   -destination 'generic/platform=iOS' \
