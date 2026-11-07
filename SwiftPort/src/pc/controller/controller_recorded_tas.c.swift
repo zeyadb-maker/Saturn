@@ -1,0 +1,1 @@
+// CONVERSION FAILED — manual Swift port required.\n// Original source: src/pc/controller/controller_recorded_tas.c\n// Reason: Ollama request failed after 1 attempt(s): 400 Client Error: Bad Request for url: http://localhost:11434/api/chat\n

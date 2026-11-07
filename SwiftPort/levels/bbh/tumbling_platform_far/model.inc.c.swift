@@ -1,0 +1,1 @@
+// CONVERSION FAILED — manual Swift port required.\n// Original source: levels/bbh/tumbling_platform_far/model.inc.c\n// Reason: Ollama request failed after 1 attempt(s): 400 Client Error: Bad Request for url: http://localhost:11434/api/chat\n
